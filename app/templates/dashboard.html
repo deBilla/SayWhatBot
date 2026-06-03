@@ -23,6 +23,18 @@
     {% endif %}
     <p class="muted">Open <a href="https://t.me/{{ bot['bot_username'] }}" target="_blank">@{{ bot['bot_username'] }}</a>
        in Telegram and send it a voice note — it'll reply with the transcription.</p>
+
+    <div class="codebox">
+      <span class="muted small">Access code</span>
+      <code class="code">{{ bot['access_code'] }}</code>
+      <p class="muted small">Anyone using this bot must send this code once to unlock. Share the bot
+         <em>and</em> this code only with people you trust.</p>
+      <form method="post" action="/bot/code" class="code-form">
+        <input type="text" name="access_code" placeholder="new code (blank = random)">
+        <button type="submit">Change code</button>
+      </form>
+    </div>
+
     <form method="post" action="/bot/disconnect">
       <button class="danger">Disconnect bot</button>
     </form>
@@ -31,6 +43,7 @@
       <summary>Replace the token</summary>
       <form method="post" action="/bot/connect">
         <input type="text" name="token" placeholder="123456:ABC-DEF..." required>
+        <input type="text" name="access_code" placeholder="access code (blank = keep random)">
         <button type="submit">Update &amp; reconnect</button>
       </form>
     </details>
@@ -38,6 +51,9 @@
     <form method="post" action="/bot/connect" class="connect">
       <label>Bot token from BotFather
         <input type="text" name="token" placeholder="123456789:ABCdef..." required autofocus>
+      </label>
+      <label>Access code <span class="muted">(optional — leave blank to auto-generate)</span>
+        <input type="text" name="access_code" placeholder="e.g. myteam2026">
       </label>
       <button type="submit">Connect bot</button>
     </form>
@@ -51,7 +67,7 @@
     <li>Send <code>/newbot</code> and follow the prompts (pick a name and a username ending in <code>bot</code>).</li>
     <li>BotFather replies with a token like <code>123456789:ABCdefGhIjK...</code> — copy it.</li>
     <li>Paste the token above and click <strong>Connect bot</strong>.</li>
-    <li>Open your new bot and send it a voice note. 🎉</li>
+    <li>Open your new bot, send it the <strong>access code</strong> shown above to unlock, then send a voice note. 🎉</li>
   </ol>
   <p class="muted small">Only one transcription runs at a time across the whole server, so during busy
      periods your request may be queued for a few seconds.</p>

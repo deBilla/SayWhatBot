@@ -6,9 +6,13 @@ import logging
 
 from telegram import Update
 from telegram.error import InvalidToken
-from telegram.ext import Application, ContextTypes, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
+import db
 import transcribe
+
+LOCKED_MSG = "🔒 This bot is private. Send the access code to unlock."
+UNLOCKED_MSG = "✅ Access granted! Send me a voice note or audio file and I'll transcribe it. 🎙️"
 
 log = logging.getLogger("bots")
 
@@ -26,7 +30,6 @@ class BotManager:
     # --- lifecycle -----------------------------------------------------------
 
     async def start_all(self) -> None:
-        import db
         for row in await db.all_enabled_bots():
             try:
                 await self._start(row["token"])
@@ -63,7 +66,9 @@ class BotManager:
         if token in self._apps:
             return
         app = Application.builder().token(token).build()
+        app.add_handler(CommandHandler("start", self._on_start))
         app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, self._on_voice))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._on_text))
         await app.initialize()
         await app.start()
         await app.updater.start_polling(drop_pending_updates=True)
@@ -83,6 +88,40 @@ class BotManager:
             log.exception("Error stopping bot")
         log.info("Stopped polling for a bot token ending …%s", token[-6:])
 
+    @staticmethod
+    async def _gate(token: str, chat_id: int):
+        """Return (bot_row, allowed). A bot with no access_code is open to all."""
+        bot = await db.get_bot_by_token(token)
+        if bot is None or not bot["access_code"]:
+            return bot, True
+        allowed = await db.is_chat_authorized(bot["id"], chat_id)
+        return bot, allowed
+
+    async def _on_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        message = update.effective_message
+        if message is None:
+            return
+        _, allowed = await self._gate(context.bot.token, message.chat_id)
+        if allowed:
+            await message.reply_text("👋 Send me a voice note or audio file and I'll transcribe it. 🎙️")
+        else:
+            await message.reply_text("👋 " + LOCKED_MSG)
+
+    async def _on_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        message = update.effective_message
+        if message is None:
+            return
+        bot, allowed = await self._gate(context.bot.token, message.chat_id)
+        if allowed:
+            await message.reply_text("✅ You're unlocked — just send a voice note or audio file. 🎙️")
+            return
+        # Gated and not yet authorized: treat the text as a candidate access code.
+        if (message.text or "").strip() == bot["access_code"]:
+            await db.authorize_chat(bot["id"], message.chat_id)
+            await message.reply_text(UNLOCKED_MSG)
+        else:
+            await message.reply_text(LOCKED_MSG)
+
     async def _on_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         message = update.effective_message
         if message is None:
@@ -90,6 +129,11 @@ class BotManager:
 
         media = message.voice or message.audio
         if media is None:
+            return
+
+        _, allowed = await self._gate(context.bot.token, message.chat_id)
+        if not allowed:
+            await message.reply_text(LOCKED_MSG)
             return
 
         if media.file_size and media.file_size > MAX_AUDIO_BYTES:

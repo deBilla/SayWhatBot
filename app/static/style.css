@@ -90,6 +90,27 @@ code {
   font-size: 13px;
 }
 
+.codebox {
+  margin: 18px 0;
+  padding: 14px 16px;
+  background: #0f1218;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.codebox .code {
+  display: inline-block;
+  margin: 4px 0 6px;
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0;
+}
+.code-form { display: flex; gap: 8px; margin-top: 8px; }
+.code-form input { margin-top: 0; }
+.code-form button { white-space: nowrap; }
+
 .reconnect { margin-top: 16px; }
 .reconnect summary { cursor: pointer; color: var(--muted); }
 .reconnect input { margin: 10px 0; }

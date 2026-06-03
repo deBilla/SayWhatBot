@@ -1,5 +1,6 @@
 """Dashboard UI: connect / disconnect a Telegram bot and view its status."""
 import logging
+import secrets
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
@@ -53,13 +54,18 @@ async def dashboard(request: Request):
     )
 
 
+def _gen_code() -> str:
+    return secrets.token_hex(3)  # 6 hex chars, e.g. "a3f9c1"
+
+
 @router.post("/bot/connect")
-async def connect_bot(request: Request, token: str = Form(...)):
+async def connect_bot(request: Request, token: str = Form(...), access_code: str = Form("")):
     user_id = current_user_id(request)
     if user_id is None:
         return RedirectResponse("/login", status_code=303)
 
     token = token.strip()
+    access_code = access_code.strip() or _gen_code()
     manager = get_bot_manager(request)
 
     try:
@@ -72,7 +78,7 @@ async def connect_bot(request: Request, token: str = Form(...)):
             f"/dashboard?error=Could+not+verify+token:+{exc}", status_code=303
         )
 
-    await db.upsert_bot(user_id, token, username)
+    await db.upsert_bot(user_id, token, username, access_code)
     try:
         await manager.connect(token)
     except Exception as exc:  # noqa: BLE001
@@ -83,6 +89,20 @@ async def connect_bot(request: Request, token: str = Form(...)):
         )
 
     return RedirectResponse(f"/dashboard?ok=Connected+@{username}", status_code=303)
+
+
+@router.post("/bot/code")
+async def update_code(request: Request, access_code: str = Form("")):
+    user_id = current_user_id(request)
+    if user_id is None:
+        return RedirectResponse("/login", status_code=303)
+
+    bot = await db.get_bot_for_user(user_id)
+    if not bot:
+        return RedirectResponse("/dashboard?error=Connect+a+bot+first.", status_code=303)
+
+    await db.set_access_code(user_id, access_code.strip() or _gen_code())
+    return RedirectResponse("/dashboard?ok=Access+code+updated.", status_code=303)
 
 
 @router.post("/bot/disconnect")
