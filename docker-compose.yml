@@ -1,0 +1,44 @@
+services:
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: saywhat-whisper
+    environment:
+      # tiny | base | small | medium | large-v3  (bigger = more accurate & slower)
+      ASR_MODEL: ${ASR_MODEL:-base}
+      # openai_whisper | faster_whisper  (faster_whisper is lighter on CPU)
+      ASR_ENGINE: ${ASR_ENGINE:-faster_whisper}
+    volumes:
+      # Persist downloaded model weights between restarts (first run downloads ~140MB for base)
+      - whisper-cache:/root/.cache
+    # Uncomment to poke the Whisper API directly from the host while debugging:
+    # ports:
+    #   - "9000:9000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/docs')"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+
+  app:
+    build: ./app
+    container_name: saywhat-app
+    environment:
+      APP_SECRET: ${APP_SECRET:?APP_SECRET is required - set it in .env}
+      WHISPER_URL: http://whisper:9000
+      WHISPER_TASK: ${WHISPER_TASK:-transcribe}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-}
+      PORT: ${PORT:-8000}
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      # Bind-mount the SQLite database so accounts/bots survive container rebuilds
+      - ./app/data:/app/data
+    depends_on:
+      whisper:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  whisper-cache:

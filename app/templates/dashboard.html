@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · SayWhatBot{% endblock %}
+{% block body %}
+<div class="dash-head">
+  <span class="muted">Signed in as <strong>{{ email }}</strong></span>
+  <form method="post" action="/logout"><button class="link">Log out</button></form>
+</div>
+
+{% if ok %}<p class="ok">{{ ok }}</p>{% endif %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<div class="card">
+  <h1>Your Telegram bot</h1>
+
+  {% if bot %}
+    <p class="status">
+      <span class="dot {{ 'on' if running else 'off' }}"></span>
+      <strong>@{{ bot['bot_username'] }}</strong>
+      &mdash; {{ 'running' if running else 'stopped' }}
+    </p>
+    {% if bot['last_error'] %}
+      <p class="error small">Last error: {{ bot['last_error'] }}</p>
+    {% endif %}
+    <p class="muted">Open <a href="https://t.me/{{ bot['bot_username'] }}" target="_blank">@{{ bot['bot_username'] }}</a>
+       in Telegram and send it a voice note — it'll reply with the transcription.</p>
+    <form method="post" action="/bot/disconnect">
+      <button class="danger">Disconnect bot</button>
+    </form>
+
+    <details class="reconnect">
+      <summary>Replace the token</summary>
+      <form method="post" action="/bot/connect">
+        <input type="text" name="token" placeholder="123456:ABC-DEF..." required>
+        <button type="submit">Update &amp; reconnect</button>
+      </form>
+    </details>
+  {% else %}
+    <form method="post" action="/bot/connect" class="connect">
+      <label>Bot token from BotFather
+        <input type="text" name="token" placeholder="123456789:ABCdef..." required autofocus>
+      </label>
+      <button type="submit">Connect bot</button>
+    </form>
+  {% endif %}
+</div>
+
+<div class="card guide">
+  <h2>How to create a Telegram bot</h2>
+  <ol>
+    <li>Open Telegram and search for <a href="https://t.me/BotFather" target="_blank"><strong>@BotFather</strong></a>.</li>
+    <li>Send <code>/newbot</code> and follow the prompts (pick a name and a username ending in <code>bot</code>).</li>
+    <li>BotFather replies with a token like <code>123456789:ABCdefGhIjK...</code> — copy it.</li>
+    <li>Paste the token above and click <strong>Connect bot</strong>.</li>
+    <li>Open your new bot and send it a voice note. 🎉</li>
+  </ol>
+  <p class="muted small">Only one transcription runs at a time across the whole server, so during busy
+     periods your request may be queued for a few seconds.</p>
+</div>
+{% endblock %}
