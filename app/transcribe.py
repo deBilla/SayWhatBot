@@ -6,6 +6,7 @@ running Whisper model only ever handles one transcription at a time, no matter
 how many users are sending audio concurrently.
 """
 import asyncio
+import io
 import logging
 import os
 import tempfile
@@ -107,12 +108,45 @@ async def _process(job: Job) -> None:
         await _safe_edit(job.message, "⚠️ Sorry, transcription failed. Please try again.")
         return
 
-    await _safe_edit(job.message, text or "🤔 No speech detected.")
+    await _deliver(job.message, text)
+
+
+# Telegram rejects any single message longer than this.
+TELEGRAM_LIMIT = 4096
+
+
+async def _deliver(message: Message, text: str) -> None:
+    """Return the transcript to the user.
+
+    Short transcripts replace the "Transcribing…" placeholder in place. Long
+    ones (a 49-min recording is tens of thousands of chars) can't fit in one
+    message, so we attach the full text as a .txt file instead of silently
+    truncating at 4096 chars.
+    """
+    if not text:
+        await _safe_edit(message, "🤔 No speech detected.")
+        return
+    if len(text) <= TELEGRAM_LIMIT:
+        await _safe_edit(message, text)
+        return
+
+    try:
+        bio = io.BytesIO(text.encode("utf-8"))
+        bio.name = "transcript.txt"
+        await message.reply_document(
+            document=bio,
+            filename="transcript.txt",
+            caption=f"📝 Transcript ({len(text):,} chars) — too long for a message, sent as a file.",
+        )
+        await _safe_edit(message, "📝 Transcript attached below ⬇️")
+    except Exception:
+        log.warning("Could not send transcript as a document; falling back to truncated message")
+        await _safe_edit(message, text[:TELEGRAM_LIMIT])
 
 
 async def _safe_edit(message: Message, text: str) -> None:
     # Telegram caps message length at 4096 chars.
-    chunk = text[:4096]
+    chunk = text[:TELEGRAM_LIMIT]
     try:
         await message.edit_text(chunk)
     except Exception:

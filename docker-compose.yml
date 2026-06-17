@@ -29,6 +29,9 @@ services:
       WHISPER_URL: http://whisper:9000
       WHISPER_TASK: ${WHISPER_TASK:-transcribe}
       WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-}
+      # Long files (e.g. a 49-min recording) can take many minutes on CPU; the
+      # /asr call only returns when the whole file is done. Default 1 hour.
+      WHISPER_TIMEOUT: ${WHISPER_TIMEOUT:-3600}
       PORT: ${PORT:-8000}
     ports:
       - "${PORT:-8000}:8000"
